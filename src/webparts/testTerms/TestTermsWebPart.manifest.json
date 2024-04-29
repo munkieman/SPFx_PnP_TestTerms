@@ -22,7 +22,8 @@
     "description": { "default": "TestTerms description" },
     "officeFabricIconFontName": "Page",
     "properties": {
-      "description": "TestTerms"
+      "description": "TestTerms",
+      "listName": ""     
     }
   }]
 }

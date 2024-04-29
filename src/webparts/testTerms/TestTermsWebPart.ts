@@ -1,7 +1,10 @@
 import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
-  PropertyPaneTextField
+  PropertyPaneTextField,
+  PropertyPaneDropdown,
+  IPropertyPaneDropdownOption,
+  IPropertyPaneGroup,
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -13,15 +16,20 @@ import { SPComponentLoader } from '@microsoft/sp-loader';
 import { spfi,SPFx } from "@pnp/sp/";
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import "@pnp/sp/taxonomy";
+import { ITermInfo } from "@pnp/sp/taxonomy";
 
 export interface ITestTermsWebPartProps {
   description: string;
+  teamName: string;
+  division: string;
+  termID: string;
 }
 
 export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWebPartProps> {
 
   private _isDarkTheme: boolean = false;
   private _environmentMessage: string = '';
+  private _teamOptions: IPropertyPaneDropdownOption[];
 
   public async render(): Promise<void> {
 
@@ -29,9 +37,20 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     const results = await sp.termStore.searchTerm({
       label: "ASM Team A",
       setId: "f6c88c73-1bc1-4019-973f-b034ea41e08a",
+      parentTermId : "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62"
     });
-    
+
     console.log(results);
+
+    // list all the terms that are direct children of this set
+    //const infos: ITermInfo[] = await sp.termStore.groups.getById("ad680eae-a3ec-4b8e-86b0-e2d2d64808a1").sets.getById("f6c88c73-1bc1-4019-973f-b034ea41e08a").children();
+    //console.log("infos",infos);
+
+    // list all the terms available in this term set by term set id
+    const TermSet: ITermInfo[] = await sp.termStore.sets.getById("f6c88c73-1bc1-4019-973f-b034ea41e08a").getTermById("2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62").children();    
+    for(let x=0;x<=TermSet.length;x++){
+      console.log("termset",TermSet[x].labels[0].name);
+    }
 
     this.domElement.innerHTML = `
     <section class="${styles.testTerms} ${!!this.context.sdks.microsoftTeams ? styles.teams : ''}">
@@ -64,6 +83,8 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     await super.onInit();
     SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css");
     SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css");
+    
+    this._teamOptions = [];
 
     return this._getEnvironmentMessage().then(message => {
       this._environmentMessage = message;
@@ -120,6 +141,34 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
+
+    const page2Obj : IPropertyPaneGroup["groupFields"] = [];
+    //let termID : string;
+
+    switch (this.properties.division) {
+      case "Assessments":
+        this.properties.termID = "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62";  
+        break;
+      case "Central":
+        this.properties.termID = "11ae0cc5-d395-4176-81a9-22f57f785afd";  
+        break;
+      case "Connect":
+        this.properties.termID = "f414e7f0-4e65-4754-a030-5ac7be12180f";  
+        break;
+      case "Employability":
+        this.properties.termID = "d4476663-0780-42da-b6a8-7ef92846f9f4";  
+        break;
+      case "Health":
+        this.properties.termID = "7c2683bf-64e6-48e2-9ab6-8021be871cb1";  
+        break;
+    }
+
+    page2Obj.push(PropertyPaneDropdown('team', {
+        label:'Please choose Team',
+        options: this._teamOptions
+      }), 
+    )
+
     return {
       pages: [
         {
@@ -132,8 +181,29 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
               groupFields: [
                 PropertyPaneTextField('description', {
                   label: strings.DescriptionFieldLabel
-                })
+                }),
+                PropertyPaneDropdown('division',{
+                  label:"Please Choose Division",
+                  options:[
+                    { key : 'assessments', text : 'Assessments'},
+                    { key : 'central', text : 'Central'},
+                    { key : 'connect', text : 'Connect'},
+                    { key : 'employability', text : 'Employability'},
+                    { key : 'health', text : 'Health'},
+                  ]
+                }),                
               ]
+            }
+          ]
+        },
+        { //Page 2
+          header: {
+            description: "Page 2 - Team Selection"
+          },
+          groups: [
+            {
+              groupName: "Sections",
+              groupFields: page2Obj
             }
           ]
         }
