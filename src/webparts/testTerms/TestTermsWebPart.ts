@@ -4,7 +4,7 @@ import {
   PropertyPaneTextField,
   PropertyPaneDropdown,
   IPropertyPaneDropdownOption,
-  IPropertyPaneGroup,
+  //IPropertyPaneGroup,
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -13,16 +13,26 @@ import styles from './TestTermsWebPart.module.scss';
 import * as strings from 'TestTermsWebPartStrings';
 
 import { SPComponentLoader } from '@microsoft/sp-loader';
-import { spfi,SPFx } from "@pnp/sp/";
-import { LogLevel, PnPLogging } from "@pnp/logging";
+import {
+  SPHttpClient,
+  SPHttpClientResponse,
+} from "@microsoft/sp-http";
+//import { spfi,SPFx } from "@pnp/sp/";
+//import { graphfi } from '@pnp/graph';
+//import { LogLevel, PnPLogging } from "@pnp/logging";
 import "@pnp/sp/taxonomy";
-import { ITermInfo } from "@pnp/sp/taxonomy";
+//import { ITermInfo } from "@pnp/sp/taxonomy";
 
 export interface ITestTermsWebPartProps {
   description: string;
   teamName: string;
   division: string;
   termID: string;
+  URL:string;
+  tenantURL: any;
+  siteTitle: string;
+  siteArray: string[];
+  teamLabels: string[];
 }
 
 export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWebPartProps> {
@@ -33,24 +43,15 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   public async render(): Promise<void> {
 
-    const sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));  
-    const results = await sp.termStore.searchTerm({
-      label: "ASM Team A",
-      setId: "f6c88c73-1bc1-4019-973f-b034ea41e08a",
-      parentTermId : "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62"
-    });
+    this._teamOptions = [];
 
-    console.log(results);
+    this.properties.URL = this.context.pageContext.web.absoluteUrl;
+    this.properties.tenantURL = this.properties.URL.split('/',5);
+    this.properties.siteTitle = this.context.pageContext.web.title;
+    this.properties.siteArray = this.properties.siteTitle.split(" - ");
+    //this.properties.division = this.properties.siteArray[0];
 
-    // list all the terms that are direct children of this set
-    //const infos: ITermInfo[] = await sp.termStore.groups.getById("ad680eae-a3ec-4b8e-86b0-e2d2d64808a1").sets.getById("f6c88c73-1bc1-4019-973f-b034ea41e08a").children();
-    //console.log("infos",infos);
-
-    // list all the terms available in this term set by term set id
-    const TermSet: ITermInfo[] = await sp.termStore.sets.getById("f6c88c73-1bc1-4019-973f-b034ea41e08a").getTermById("2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62").children();    
-    for(let x=0;x<=TermSet.length;x++){
-      console.log("termset",TermSet[x].labels[0].name);
-    }
+    console.log("Render division",this.properties.division);
 
     this.domElement.innerHTML = `
     <section class="${styles.testTerms} ${!!this.context.sdks.microsoftTeams ? styles.teams : ''}">
@@ -77,15 +78,69 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
           </ul>
       </div>
     </section>`;
+
+    this.getTerms();
   }
 
+  public async getTerms():Promise<void>{
+
+    if(this.properties.division !== undefined){
+      //*** search for a term by label
+      //const results = await sp.termStore.searchTerm({
+      //  label: "ASM Team A",
+      //  setId: setID,
+      //  parentTermId : this.properties.termID
+      //});
+      //console.log(results);
+
+      //*** list all the terms that are direct children of a set
+      //const setChildren: ITermInfo[] = await sp.termStore.groups.getById(groupID).sets.getById(setID).getAllChildrenAsOrderedTree();
+      //console.log("set children",setChildren);
+
+      //*** list all the terms that are direct children of a given term
+      //const termChildren: ITermInfo[] = await sp.termStore.sets.getById(setID).getTermById(this.properties.termID).children();    
+      //console.log("terms children",termChildren);
+    }
+
+    await this.getTeamLabels()
+    .then((response) => {
+      console.log("render response",response);
+      for(let x=0;x<response.value.length;x++){
+        const teamName = response.value[x].labels[0].name;
+
+        //console.log(response.value[x].labels[0].name); 
+        //this.properties.teamLabels[x]=response.value[x].labels[0].name;
+        this._teamOptions.push(<IPropertyPaneDropdownOption>{
+          text: teamName,
+          key: teamName 
+        })
+      }
+      console.log(this._teamOptions);
+    }); 
+  }
+
+  private async getTeamLabels():Promise<any>{
+    const groupID : string = "a66b7b2f-9f5d-4573-b763-542518574351";
+    const setID : string = "f6c88c73-1bc1-4019-973f-b034ea41e08a";
+    //const sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));  
+
+    const url: string = `https://${this.properties.tenantURL[2]}/_api/v2.1/termStore/groups/${groupID}/sets/${setID}/terms/${this.properties.termID}/children?select=id,labels`;
+    console.log(url);
+
+    return this.context.spHttpClient
+      .get(url, SPHttpClient.configurations.v1)
+      .then((response: SPHttpClientResponse) => {
+        if (response.ok) {
+          return response.json();
+        }
+      });
+  }
+  
   public async onInit(): Promise<void> {
     await super.onInit();
     SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css");
     SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css");
     
-    this._teamOptions = [];
-
     return this._getEnvironmentMessage().then(message => {
       this._environmentMessage = message;
     });
@@ -133,7 +188,6 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       this.domElement.style.setProperty('--link', semanticColors.link || null);
       this.domElement.style.setProperty('--linkHovered', semanticColors.linkHovered || null);
     }
-
   }
 
   protected get dataVersion(): Version {
@@ -142,32 +196,42 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
 
-    const page2Obj : IPropertyPaneGroup["groupFields"] = [];
-    //let termID : string;
+    //const page2Obj : IPropertyPaneGroup["groupFields"] = [];
+    let teamDropdown : any = PropertyPaneDropdown('teamName',{
+      label:"Please Choose a Team",
+      options:[{key : "", text: "test"}]});
 
     switch (this.properties.division) {
-      case "Assessments":
-        this.properties.termID = "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62";  
+      case "assessments":
+        this.properties.termID = "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62"; 
         break;
-      case "Central":
+      case "central":
         this.properties.termID = "11ae0cc5-d395-4176-81a9-22f57f785afd";  
         break;
-      case "Connect":
+      case "connect":
         this.properties.termID = "f414e7f0-4e65-4754-a030-5ac7be12180f";  
         break;
-      case "Employability":
+      case "employability":
         this.properties.termID = "d4476663-0780-42da-b6a8-7ef92846f9f4";  
         break;
-      case "Health":
+      case "health":
         this.properties.termID = "7c2683bf-64e6-48e2-9ab6-8021be871cb1";  
         break;
     }
+    
+    //page2Obj.push(PropertyPaneDropdown('team', {
+    //    label:'Please choose Team',
+    //    options: this._teamOptions
+    //  }), 
+    //)
 
-    page2Obj.push(PropertyPaneDropdown('team', {
-        label:'Please choose Team',
-        options: this._teamOptions
-      }), 
-    )
+    console.log("division",this.properties.division);
+    console.log("termID",this.properties.termID);
+
+    teamDropdown = PropertyPaneDropdown('teamName',{
+      label:"Please Choose a Team",
+      options:this._teamOptions
+    }); 
 
     return {
       pages: [
@@ -191,22 +255,12 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
                     { key : 'employability', text : 'Employability'},
                     { key : 'health', text : 'Health'},
                   ]
-                }),                
+                }), 
+                teamDropdown               
               ]
             }
           ]
         },
-        { //Page 2
-          header: {
-            description: "Page 2 - Team Selection"
-          },
-          groups: [
-            {
-              groupName: "Sections",
-              groupFields: page2Obj
-            }
-          ]
-        }
       ]
     };
   }
