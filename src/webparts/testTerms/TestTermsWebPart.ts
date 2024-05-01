@@ -4,7 +4,7 @@ import {
   PropertyPaneTextField,
   PropertyPaneDropdown,
   IPropertyPaneDropdownOption,
-  //IPropertyPaneGroup,
+  IPropertyPaneGroup,
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -62,67 +62,38 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
         <div>Web part property value: <strong>${escape(this.properties.description)}</strong></div>
       </div>
       <div>
-        <h3>Welcome to SharePoint Framework!</h3>
-        <p>
-        The SharePoint Framework (SPFx) is a extensibility model for Microsoft Viva, Microsoft Teams and SharePoint. It's the easiest way to extend Microsoft 365 with automatic Single Sign On, automatic hosting and industry standard tooling.
-        </p>
-        <h4>Learn more about SPFx development:</h4>
-          <ul class="${styles.links}">
-            <li><a href="https://aka.ms/spfx" target="_blank">SharePoint Framework Overview</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-graph" target="_blank">Use Microsoft Graph in your solution</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-teams" target="_blank">Build for Microsoft Teams using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-viva" target="_blank">Build for Microsoft Viva Connections using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-store" target="_blank">Publish SharePoint Framework applications to the marketplace</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-api" target="_blank">SharePoint Framework API reference</a></li>
-            <li><a href="https://aka.ms/m365pnp" target="_blank">Microsoft 365 Developer Community</a></li>
-          </ul>
+        <h4>${this.properties.division}</h4>
+        <h5>${this.properties.teamName}</h5>
       </div>
     </section>`;
 
-    this.getTerms();
-  }
+    console.log("division",this.properties.division);
+    console.log("termID",this.properties.termID);
 
-  public async getTerms():Promise<void>{
-
-    if(this.properties.division !== undefined){
-      //*** search for a term by label
-      //const results = await sp.termStore.searchTerm({
-      //  label: "ASM Team A",
-      //  setId: setID,
-      //  parentTermId : this.properties.termID
-      //});
-      //console.log(results);
-
-      //*** list all the terms that are direct children of a set
-      //const setChildren: ITermInfo[] = await sp.termStore.groups.getById(groupID).sets.getById(setID).getAllChildrenAsOrderedTree();
-      //console.log("set children",setChildren);
-
-      //*** list all the terms that are direct children of a given term
-      //const termChildren: ITermInfo[] = await sp.termStore.sets.getById(setID).getTermById(this.properties.termID).children();    
-      //console.log("terms children",termChildren);
-    }
-
-    await this.getTeamLabels()
-    .then((response) => {
-      console.log("render response",response);
-      for(let x=0;x<response.value.length;x++){
-        const teamName = response.value[x].labels[0].name;
-
-        //console.log(response.value[x].labels[0].name); 
-        //this.properties.teamLabels[x]=response.value[x].labels[0].name;
-        this._teamOptions.push(<IPropertyPaneDropdownOption>{
-          text: teamName,
-          key: teamName 
-        })
-      }
-      console.log(this._teamOptions);
-    }); 
   }
 
   private async getTeamLabels():Promise<any>{
-    const groupID : string = "a66b7b2f-9f5d-4573-b763-542518574351";
+    const groupID : string = "ad680eae-a3ec-4b8e-86b0-e2d2d64808a1";
     const setID : string = "f6c88c73-1bc1-4019-973f-b034ea41e08a";
     //const sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));  
+
+    switch(this.properties.division){
+      case 'assessments':
+        this.properties.termID = '2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62';
+        break;
+      case 'central':
+        this.properties.termID = '11ae0cc5-d395-4176-81a9-22f57f785afd';
+        break;
+      case 'connect':
+        this.properties.termID = 'f414e7f0-4e65-4754-a030-5ac7be12180f';
+        break;
+      case 'employability':
+        this.properties.termID = 'd4476663-0780-42da-b6a8-7ef92846f9f4';
+        break;
+      case 'health':
+        this.properties.termID = '7c2683bf-64e6-48e2-9ab6-8021be871cb1';
+        break;
+    }
 
     const url: string = `https://${this.properties.tenantURL[2]}/_api/v2.1/termStore/groups/${groupID}/sets/${setID}/terms/${this.properties.termID}/children?select=id,labels`;
     console.log(url);
@@ -196,42 +167,45 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
 
-    //const page2Obj : IPropertyPaneGroup["groupFields"] = [];
-    let teamDropdown : any = PropertyPaneDropdown('teamName',{
-      label:"Please Choose a Team",
-      options:[{key : "", text: "test"}]});
-
-    switch (this.properties.division) {
-      case "assessments":
-        this.properties.termID = "2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62"; 
-        break;
-      case "central":
-        this.properties.termID = "11ae0cc5-d395-4176-81a9-22f57f785afd";  
-        break;
-      case "connect":
-        this.properties.termID = "f414e7f0-4e65-4754-a030-5ac7be12180f";  
-        break;
-      case "employability":
-        this.properties.termID = "d4476663-0780-42da-b6a8-7ef92846f9f4";  
-        break;
-      case "health":
-        this.properties.termID = "7c2683bf-64e6-48e2-9ab6-8021be871cb1";  
-        break;
-    }
+    const page2Obj : IPropertyPaneGroup["groupFields"] = [];
+    //let teamDropdown = PropertyPaneDropdown('teamName',{
+    //  label:"Please Choose a Team",
+    //  options:[{key : "", text: ""}]});
     
-    //page2Obj.push(PropertyPaneDropdown('team', {
-    //    label:'Please choose Team',
-    //    options: this._teamOptions
-    //  }), 
-    //)
+    if(this.properties.division !== undefined){
+      
+      this.getTeamLabels().then((response) => {
+        console.log("render response",response);
+        this._teamOptions = [];
+
+        for(let x=0;x<response.value.length;x++){
+          const teamName = response.value[x].labels[0].name;
+  
+          //console.log(response.value[x].labels[0].name); 
+          //this.properties.teamLabels[x]=response.value[x].labels[0].name;
+          this._teamOptions.push(<IPropertyPaneDropdownOption>{
+            text: teamName,
+            key: teamName 
+          })
+        }
+        console.log("options",this._teamOptions);
+        this.onDispose();         
+      });
+    }
 
     console.log("division",this.properties.division);
     console.log("termID",this.properties.termID);
 
-    teamDropdown = PropertyPaneDropdown('teamName',{
-      label:"Please Choose a Team",
-      options:this._teamOptions
-    }); 
+    page2Obj.push(
+      PropertyPaneDropdown('teamName', {
+        label:'Please choose Team',
+        options: this._teamOptions
+      }), 
+    )    
+    //teamDropdown = PropertyPaneDropdown('teamName',{
+    //  label:"Please Choose a Team",
+    //  options:this._teamOptions
+    //});
 
     return {
       pages: [
@@ -256,11 +230,22 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
                     { key : 'health', text : 'Health'},
                   ]
                 }), 
-                teamDropdown               
+                //teamDropdown               
               ]
             }
           ]
         },
+        { //Page 2
+          header: {
+            description: "Page 2"
+          },
+          groups: [
+            {
+              groupName: "Team Names",
+              groupFields: page2Obj
+            }
+          ]
+        },        
       ]
     };
   }
