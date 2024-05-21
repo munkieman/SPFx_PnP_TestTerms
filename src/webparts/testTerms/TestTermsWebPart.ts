@@ -78,7 +78,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
     this.properties.URL = this.context.pageContext.web.absoluteUrl;
     this.properties.siteTitle = this.context.pageContext.web.title;
-    //this.properties.tenantURL = this.properties.URL.split('/',5);
+    this.properties.tenantURL = this.properties.URL.split('/',5);
     //this.properties.siteArray = this.properties.siteTitle.split(" - ");
     //this.properties.divisionTitle = this.properties.siteTitle.split(" - ")[0];
     //this.properties.siteName = this.properties.siteTitle.split(" - ")[1];
