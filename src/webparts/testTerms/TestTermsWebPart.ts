@@ -76,18 +76,20 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
     let libraryFlag : boolean = false;
 
-    this.properties.termFlag = false;
-    this._teamOptions = [];
     this.properties.URL = this.context.pageContext.web.absoluteUrl;
-    this.properties.tenantURL = this.properties.URL.split('/',5);
     this.properties.siteTitle = this.context.pageContext.web.title;
-    this.properties.siteArray = this.properties.siteTitle.split(" - ");
-    this.properties.divisionTitle = this.properties.siteTitle.split(" - ")[0];
-    this.properties.siteName = this.properties.siteTitle.split(" - ")[1];
+    //this.properties.tenantURL = this.properties.URL.split('/',5);
+    //this.properties.siteArray = this.properties.siteTitle.split(" - ");
+    //this.properties.divisionTitle = this.properties.siteTitle.split(" - ")[0];
+    //this.properties.siteName = this.properties.siteTitle.split(" - ")[1];
 
     if(this.properties.division !== undefined){
+      this.properties.termFlag = false;
+      this._teamOptions = [];
+
       this.getTeamOptions();
       alert('team options completed');  
+      console.log(this._teamOptions);
     }
 
     if(this.properties.teamTerm!==undefined){
@@ -129,6 +131,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       libraryFlag = await this.checkDataAsync("policies",this.properties.teamName,"");
     }
 
+    console.log("***********************************************");
     console.log("Render Function");
     console.log("division",this.properties.division);
     console.log("division termID",this.properties.parentTermID);
@@ -248,7 +251,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
           }
           //this.onDispose();         
         }).catch(err => {
-          console.log('getTeamOptions ERROR:', err.response.data);
+          console.log('getTeamOptions ERROR:', err);
         });
         this.properties.teamDataChk = true;        
       }
@@ -344,6 +347,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
     }
 
+    console.log("***********************************************");
     console.log("Property Pane Config");
     console.log("division",this.properties.division);
     console.log("division termID",this.properties.parentTermID);
@@ -360,12 +364,6 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       }), 
     )    
 */
-
-    if(this.properties.teamTerm!==undefined){
-      this.properties.teamName = this.properties.teamTerm.split(';')[0];
-      this.properties.teamTermID = this.properties.teamTerm.split(';')[1];
-      this.properties.termFlag = true;
-    } 
 
     this.onDispose();         
 
