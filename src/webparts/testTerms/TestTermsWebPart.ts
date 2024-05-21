@@ -1,10 +1,14 @@
-import { Version } from '@microsoft/sp-core-library';
+import { Version, Log } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
-  PropertyPaneTextField,
+  //PropertyPaneTextField,
   PropertyPaneDropdown,
   IPropertyPaneDropdownOption,
-  IPropertyPaneGroup,
+  //PropertyPaneChoiceGroup,
+  //IPropertyPaneGroup,
+  PropertyPaneHorizontalRule,
+  PropertyPaneLabel,
+  PropertyPaneToggle,
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -23,16 +27,43 @@ import {
 import "@pnp/sp/taxonomy";
 //import { ITermInfo } from "@pnp/sp/taxonomy";
 
+let teamSelect : any={};
+
 export interface ITestTermsWebPartProps {
   description: string;
-  teamName: string;
-  division: string;
-  termID: string;
+
   URL:string;
   tenantURL: any;
+  divisionTitle:string;
   siteTitle: string;
+  siteName: string;
   siteArray: string[];
+
+  parentTermID: string;
+  divisionDC: string;
+  division: string;
   teamLabels: string[];
+  teamTerm: string;
+  teamTermID: string;
+  teamName: string;
+  termID: string;
+  teamNamePrev : string;
+  termFlag:boolean;
+  teamDataChk: boolean;
+
+  isDCPowerUser:any;
+  isTeamPowerUser:any;
+}
+
+export interface ISPLists {
+  value: ISPList[];
+}
+
+export interface ISPList {
+  Id : string;
+  Title : string;
+  DC_Team: string;
+  TermGuid : string;
 }
 
 export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWebPartProps> {
@@ -43,15 +74,35 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   public async render(): Promise<void> {
 
-    this._teamOptions = [];
+    let libraryFlag : boolean = false;
 
+    this.properties.termFlag = false;
+    this._teamOptions = [];
     this.properties.URL = this.context.pageContext.web.absoluteUrl;
     this.properties.tenantURL = this.properties.URL.split('/',5);
     this.properties.siteTitle = this.context.pageContext.web.title;
     this.properties.siteArray = this.properties.siteTitle.split(" - ");
-    //this.properties.division = this.properties.siteArray[0];
+    this.properties.divisionTitle = this.properties.siteTitle.split(" - ")[0];
+    this.properties.siteName = this.properties.siteTitle.split(" - ")[1];
 
-    console.log("Render division",this.properties.division);
+    if(this.properties.division !== undefined){
+      this.getTeamOptions();
+      alert('team options completed');  
+    }
+
+    if(this.properties.teamTerm!==undefined){
+      this.properties.teamName = this.properties.teamTerm.split(';')[0];
+      this.properties.teamTermID = this.properties.teamTerm.split(';')[1];
+      this.properties.termFlag = true;
+    } 
+  
+//    if(this.properties.teamNamePrev === undefined){
+//      this.properties.teamNamePrev = this.properties.teamName;
+//    }
+
+
+      //if(this.properties.teamTermID !== undefined){
+      //} 
 
     this.domElement.innerHTML = `
     <section class="${styles.testTerms} ${!!this.context.sdks.microsoftTeams ? styles.teams : ''}">
@@ -62,41 +113,111 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
         <div>Web part property value: <strong>${escape(this.properties.description)}</strong></div>
       </div>
       <div>
-        <h4>${this.properties.division}</h4>
-        <h5>${this.properties.teamName}</h5>
+        <h5 class="text-black">DC Data ${this.properties.divisionDC}</h5>
+        <h5 class="text-black">Division ${this.properties.division}</h5>
+        <h5 class="text-black">Team ${this.properties.teamName}</h5>
+        <h5 class="text-black">Term ID ${this.properties.teamTermID}</h5>
+        <h5 class="text-black">Team Prev ${this.properties.teamNamePrev}</h5>
+        <h5 class="text-black">TeamDataCHK ${this.properties.teamDataChk}</h5>
+        <h5 class="text-black">TermFlag ${this.properties.termFlag}</h5>
+        <h5 class="text-black">DC Power User ${this.properties.isDCPowerUser}</h5>
+        <h5 class="text-black">Team Power User ${this.properties.isTeamPowerUser}</h5>
       </div>
     </section>`;
 
-    console.log("division",this.properties.division);
-    console.log("termID",this.properties.termID);
+    if(this.properties.termFlag){
+      libraryFlag = await this.checkDataAsync("policies",this.properties.teamName,"");
+    }
 
+    console.log("Render Function");
+    console.log("division",this.properties.division);
+    console.log("division termID",this.properties.parentTermID);
+    console.log("teamName",this.properties.teamName);
+    console.log("teamTermID",this.properties.teamTermID);
+    console.log("teamName Prev",this.properties.teamNamePrev);
+    console.log("teamDataCHK",this.properties.teamDataChk);
+    console.log("libraryFlag",libraryFlag);
   }
 
-  private async getTeamLabels():Promise<any>{
-    const groupID : string = "ad680eae-a3ec-4b8e-86b0-e2d2d64808a1";
-    const setID : string = "f6c88c73-1bc1-4019-973f-b034ea41e08a";
-    //const sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));  
+  private async checkDataAsync(library:string,team:string,category:string):Promise<boolean> {
+     
+    let dcName : string = "";      
+    let dataFlag : boolean = false;
 
+    // *** revise this to check all DCs for Team and SharedWith.
     switch(this.properties.division){
-      case 'assessments':
-        this.properties.termID = '2e21f62b-594b-4a88-aa9f-a1b6aa7e1f62';
+      case "Assessments":
+        dcName = "asm_dc";
         break;
-      case 'central':
-        this.properties.termID = '11ae0cc5-d395-4176-81a9-22f57f785afd';
+      case "Central":
+        dcName = "cen_dc";
         break;
-      case 'connect':
-        this.properties.termID = 'f414e7f0-4e65-4754-a030-5ac7be12180f';
+      case "Connect":
+        dcName = "cnn_dc";
         break;
-      case 'employability':
-        this.properties.termID = 'd4476663-0780-42da-b6a8-7ef92846f9f4';
+      case "Employability":
+        dcName = "emp_dc";
         break;
-      case 'health':
-        this.properties.termID = '7c2683bf-64e6-48e2-9ab6-8021be871cb1';
+      case "Health":
+        dcName = "hea_dc";
         break;
     }
 
-    const url: string = `https://${this.properties.tenantURL[2]}/_api/v2.1/termStore/groups/${groupID}/sets/${setID}/terms/${this.properties.termID}/children?select=id,labels`;
-    console.log(url);
+    await this.checkData(dcName,library,team,category)
+      .then((response: any) => {
+        console.log("CheckData",response);
+        for(let x=0;x<response.value.length;x++){
+          const teamID = response.value[x].DC_Team.TermGuid;
+
+          if(response.value.length>0 && teamID === this.properties.teamTermID){          
+            dataFlag = true; 
+          }            
+        }
+      });
+      return dataFlag;
+  }
+
+  private async checkData(dcName:string,library:string,team:string,category:string):Promise<ISPLists> {
+    
+    let requestUrl = '';
+    console.log("checkdata",dcName," ",team);
+
+    //_api/web/lists/GetByTitle('policies')/items?$select=*,TaxCatchAll/ID,TaxCatchAll/Term&$expand=TaxCatchAll&$filter=TaxCatchAll/@odata.id eq '7578f741-bff1-4093-97fc-283a7f330ccb'
+
+    if(category === ''){
+        requestUrl=`https://${this.properties.tenantURL[2]}/sites/${dcName}/_api/web/lists/GetByTitle('${library}')/items?$select=*,TaxCatchAll/Term&$expand=TaxCatchAll/Term&$filter=TaxCatchAll/Term eq '${team}'&$top=10`;
+    }else{
+      requestUrl=`https://${this.properties.tenantURL[2]}/sites/${dcName}/_api/web/lists/GetByTitle('${library}')/items?$select=*,TaxCatchAll/Term&$expand=TaxCatchAll/Term&$filter=TaxCatchAll/Term eq '${category}'&$top=10`;
+    }
+    return this.context.spHttpClient.get(requestUrl, SPHttpClient.configurations.v1)
+      .then((response : SPHttpClientResponse) => {
+        return response.json();
+      });   
+  }
+
+  private async getTeamLabels():Promise<any>{
+    const teamGroupID : string = "a66b7b2f-9f5d-4573-b763-542518574351";
+    const teamSetID : string = "a9620950-3da0-4ab8-b191-f976f8b27852";
+
+    switch(this.properties.division){
+      case 'Assessments':
+        this.properties.parentTermID = '3483090f-6789-4737-9e62-da5a85b0644c';
+        break;
+      case 'Central':
+        this.properties.parentTermID = 'f6e49543-f1e4-4baf-8348-740e4ea33285';
+        break;
+      case 'Connect':
+        this.properties.parentTermID = '41bd7d76-804c-4af8-962b-aa65bb01fae9';
+        break;
+      case 'Employability':
+        this.properties.parentTermID = '99b913be-47a5-4c2b-8f98-632b6288bdc1';
+        break;
+      case 'Health':
+        this.properties.parentTermID = 'c589da32-40f2-4087-b399-ffb692a2fb68';
+        break;
+    }
+   
+    const url: string = `https://${this.properties.tenantURL[2]}/_api/v2.1/termStore/groups/${teamGroupID}/sets/${teamSetID}/terms/${this.properties.parentTermID}/children?select=id,labels`;
 
     return this.context.spHttpClient
       .get(url, SPHttpClient.configurations.v1)
@@ -106,6 +227,36 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
         }
       });
   }
+
+  private getTeamOptions(): void {
+    try{
+      if(this.properties.division !== undefined){
+        
+        this.getTeamLabels().then( (response) => {
+          this._teamOptions = [];
+
+          for(let x=0;x<response.value.length;x++){
+            //console.log("teamOptions",response);
+
+            const teamName = response.value[x].labels[0].name;
+            const teamTermID = response.value[x].id;
+    
+            this._teamOptions.push(<IPropertyPaneDropdownOption>{
+              text: teamName,
+              key: teamName + ";" + teamTermID
+            })
+          }
+          //this.onDispose();         
+        }).catch(err => {
+          console.log('getTeamOptions ERROR:', err.response.data);
+        });
+        this.properties.teamDataChk = true;        
+      }
+    }catch(err){
+      Log.error('DocumentCentre', new Error('getTeamOptions Error message'), err);
+    }
+    return;
+  }  
   
   public async onInit(): Promise<void> {
     await super.onInit();
@@ -167,82 +318,112 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
 
-    const page2Obj : IPropertyPaneGroup["groupFields"] = [];
-    //let teamDropdown = PropertyPaneDropdown('teamName',{
-    //  label:"Please Choose a Team",
-    //  options:[{key : "", text: ""}]});
+    //const page2Obj : IPropertyPaneGroup["groupFields"] = [];
+    let divisionDropdown : any={};
     
-    if(this.properties.division !== undefined){
-      
-      this.getTeamLabels().then((response) => {
-        console.log("render response",response);
-        this._teamOptions = [];
+    divisionDropdown = PropertyPaneDropdown('division',{
+      label:"Please choose your Division",
+      options:[
+        { key : 'Assessments', text : 'Assessments'},
+        { key : 'Central', text : 'Central'},
+        { key : 'Connect', text : 'Connect'},
+        { key : 'Employability', text : 'Employability'},
+        { key : 'Health', text : 'Health'},
+      ]
+    });
 
-        for(let x=0;x<response.value.length;x++){
-          const teamName = response.value[x].labels[0].name;
-  
-          //console.log(response.value[x].labels[0].name); 
-          //this.properties.teamLabels[x]=response.value[x].labels[0].name;
-          this._teamOptions.push(<IPropertyPaneDropdownOption>{
-            text: teamName,
-            key: teamName 
-          })
-        }
-        console.log("options",this._teamOptions);
-        this.onDispose();         
-      });
+    if(this.properties.division !== undefined){
+      //this.getTeamOptions();
+
+      if(this.properties.teamDataChk){
+        teamSelect =  PropertyPaneDropdown('teamTerm', {
+          label:'Please choose your team',
+          options: this._teamOptions
+        });
+      }
+
     }
 
+    console.log("Property Pane Config");
     console.log("division",this.properties.division);
-    console.log("termID",this.properties.termID);
+    console.log("division termID",this.properties.parentTermID);
+    console.log("teamName",this.properties.teamName);
+    console.log("teamTermID",this.properties.teamTermID);
+    console.log("teamName Prev",this.properties.teamNamePrev);
+    console.log("teamDataCHK",this.properties.teamDataChk);
 
+/*    
     page2Obj.push(
-      PropertyPaneDropdown('teamName', {
+      PropertyPaneDropdown('teamTerm', {
         label:'Please choose Team',
         options: this._teamOptions
       }), 
     )    
-    //teamDropdown = PropertyPaneDropdown('teamName',{
-    //  label:"Please Choose a Team",
-    //  options:this._teamOptions
-    //});
+*/
+
+    if(this.properties.teamTerm!==undefined){
+      this.properties.teamName = this.properties.teamTerm.split(';')[0];
+      this.properties.teamTermID = this.properties.teamTerm.split(';')[1];
+      this.properties.termFlag = true;
+    } 
+
+    this.onDispose();         
 
     return {
       pages: [
         {
           header: {
-            description: strings.PropertyPaneDescription
+            description: "Page 1 - Document Centre Setup",
           },
           groups: [
             {
-              groupName: strings.BasicGroupName,
+              groupName: "Division",
               groupFields: [
-                PropertyPaneTextField('description', {
-                  label: strings.DescriptionFieldLabel
+                PropertyPaneLabel('',{
+                  text: "Document Centre Data"
                 }),
-                PropertyPaneDropdown('division',{
-                  label:"Please Choose Division",
-                  options:[
-                    { key : 'assessments', text : 'Assessments'},
-                    { key : 'central', text : 'Central'},
-                    { key : 'connect', text : 'Connect'},
-                    { key : 'employability', text : 'Employability'},
-                    { key : 'health', text : 'Health'},
-                  ]
-                }), 
-                //teamDropdown               
+                PropertyPaneLabel('',{
+                  text: "This option is where the data is collected from. \n\n\n All Document Centres is the default and will check all DC libraries for the selected team files"
+                }),
+                PropertyPaneDropdown("divisionDC", {
+                  label: "Please Choose Document Centre",
+                  options: [
+                    { key: "All", text: "All Document Centres" },
+                    { key: "ASM", text: "Assessments DC Only" },
+                    { key: "CEN", text: "Central DC Only" },
+                    { key: "CNN", text: "Connect DC Only" },
+                    { key: "EMP", text: "Employability DC Only" },
+                    { key: "HEA", text: "Health DC Only" },
+                  ],
+                }),
+                PropertyPaneHorizontalRule(),
+                PropertyPaneToggle('isDCPowerUser', { 
+                  key: 'DCPWToggle',
+                  label: 'DC Power User?',
+                  onText: 'Yes',
+                  offText: 'No'                  
+                })
               ]
             }
           ]
         },
         { //Page 2
           header: {
-            description: "Page 2"
+            description: "Page 2 - Team Selection"
           },
           groups: [
             {
-              groupName: "Team Names",
-              groupFields: page2Obj
+              groupName: "Please Select Your Division & Team",
+              groupFields: [
+                PropertyPaneToggle('isTeamPowerUser', { 
+                  key : 'TeamPWToggel',
+                  label: 'Team Power User?',
+                  onText: 'Yes',
+                  offText: 'No'                  
+                }),
+                divisionDropdown,
+                teamSelect
+              ]
             }
           ]
         },        
