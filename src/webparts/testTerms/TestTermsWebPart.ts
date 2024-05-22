@@ -1,4 +1,4 @@
-import { Version, Log } from '@microsoft/sp-core-library';
+import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
   //PropertyPaneTextField,
@@ -9,6 +9,7 @@ import {
   PropertyPaneHorizontalRule,
   PropertyPaneLabel,
   PropertyPaneToggle,
+  PropertyPaneCheckbox
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -24,10 +25,8 @@ import {
 //import { spfi,SPFx } from "@pnp/sp/";
 //import { graphfi } from '@pnp/graph';
 //import { LogLevel, PnPLogging } from "@pnp/logging";
-import "@pnp/sp/taxonomy";
+//import "@pnp/sp/taxonomy";
 //import { ITermInfo } from "@pnp/sp/taxonomy";
-
-let teamSelect : any={};
 
 export interface ITestTermsWebPartProps {
   description: string;
@@ -42,6 +41,7 @@ export interface ITestTermsWebPartProps {
   parentTermID: string;
   divisionDC: string;
   division: string;
+  libraryChk: boolean;
   teamLabels: string[];
   teamTerm: string;
   teamTermID: string;
@@ -74,22 +74,19 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   public async render(): Promise<void> {
 
-    let libraryFlag : boolean = false;
-
     this.properties.URL = this.context.pageContext.web.absoluteUrl;
     this.properties.siteTitle = this.context.pageContext.web.title;
     this.properties.tenantURL = this.properties.URL.split('/',5);
-    //this.properties.siteArray = this.properties.siteTitle.split(" - ");
-    //this.properties.divisionTitle = this.properties.siteTitle.split(" - ")[0];
-    //this.properties.siteName = this.properties.siteTitle.split(" - ")[1];
+    this.properties.termFlag = false;
+    this.properties.libraryChk = false;
+    this._teamOptions = [];
 
     if(this.properties.division !== undefined){
-      this.properties.termFlag = false;
-      this._teamOptions = [];
-
-      this.getTeamOptions();
-      alert('team options completed');  
-      console.log(this._teamOptions);
+      await this.getTeamOptions().then(()=>{
+        console.log("render getTeamOptions");
+        console.log("teamOptions length",this._teamOptions.length);  
+        alert('team options completed');
+      });
     }
 
     if(this.properties.teamTerm!==undefined){
@@ -98,14 +95,6 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       this.properties.termFlag = true;
     } 
   
-//    if(this.properties.teamNamePrev === undefined){
-//      this.properties.teamNamePrev = this.properties.teamName;
-//    }
-
-
-      //if(this.properties.teamTermID !== undefined){
-      //} 
-
     this.domElement.innerHTML = `
     <section class="${styles.testTerms} ${!!this.context.sdks.microsoftTeams ? styles.teams : ''}">
       <div class="${styles.welcome}">
@@ -128,77 +117,22 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     </section>`;
 
     if(this.properties.termFlag){
-      libraryFlag = await this.checkDataAsync("policies",this.properties.teamName,"");
+      alert("term flag="+this.properties.termFlag);
     }
 
-    console.log("***********************************************");
-    console.log("Render Function");
-    console.log("division",this.properties.division);
-    console.log("division termID",this.properties.parentTermID);
-    console.log("teamName",this.properties.teamName);
-    console.log("teamTermID",this.properties.teamTermID);
-    console.log("teamName Prev",this.properties.teamNamePrev);
-    console.log("teamDataCHK",this.properties.teamDataChk);
-    console.log("libraryFlag",libraryFlag);
+    this.properties.teamNamePrev = this.properties.teamName;
+
+    //console.log("***********************************************");
+    //console.log("Render Function");
+    //console.log("division",this.properties.division);
+    //console.log("division termID",this.properties.parentTermID);
+    //console.log("teamName",this.properties.teamName);
+    //console.log("teamTermID",this.properties.teamTermID);
+    //console.log("teamName Prev",this.properties.teamNamePrev);
+    //console.log("teamDataCHK",this.properties.teamDataChk);
   }
 
-  private async checkDataAsync(library:string,team:string,category:string):Promise<boolean> {
-     
-    let dcName : string = "";      
-    let dataFlag : boolean = false;
-
-    // *** revise this to check all DCs for Team and SharedWith.
-    switch(this.properties.division){
-      case "Assessments":
-        dcName = "asm_dc";
-        break;
-      case "Central":
-        dcName = "cen_dc";
-        break;
-      case "Connect":
-        dcName = "cnn_dc";
-        break;
-      case "Employability":
-        dcName = "emp_dc";
-        break;
-      case "Health":
-        dcName = "hea_dc";
-        break;
-    }
-
-    await this.checkData(dcName,library,team,category)
-      .then((response: any) => {
-        console.log("CheckData",response);
-        for(let x=0;x<response.value.length;x++){
-          const teamID = response.value[x].DC_Team.TermGuid;
-
-          if(response.value.length>0 && teamID === this.properties.teamTermID){          
-            dataFlag = true; 
-          }            
-        }
-      });
-      return dataFlag;
-  }
-
-  private async checkData(dcName:string,library:string,team:string,category:string):Promise<ISPLists> {
-    
-    let requestUrl = '';
-    console.log("checkdata",dcName," ",team);
-
-    //_api/web/lists/GetByTitle('policies')/items?$select=*,TaxCatchAll/ID,TaxCatchAll/Term&$expand=TaxCatchAll&$filter=TaxCatchAll/@odata.id eq '7578f741-bff1-4093-97fc-283a7f330ccb'
-
-    if(category === ''){
-        requestUrl=`https://${this.properties.tenantURL[2]}/sites/${dcName}/_api/web/lists/GetByTitle('${library}')/items?$select=*,TaxCatchAll/Term&$expand=TaxCatchAll/Term&$filter=TaxCatchAll/Term eq '${team}'&$top=10`;
-    }else{
-      requestUrl=`https://${this.properties.tenantURL[2]}/sites/${dcName}/_api/web/lists/GetByTitle('${library}')/items?$select=*,TaxCatchAll/Term&$expand=TaxCatchAll/Term&$filter=TaxCatchAll/Term eq '${category}'&$top=10`;
-    }
-    return this.context.spHttpClient.get(requestUrl, SPHttpClient.configurations.v1)
-      .then((response : SPHttpClientResponse) => {
-        return response.json();
-      });   
-  }
-
-  private async getTeamLabels():Promise<any>{
+  private getTeamLabels():Promise<any>{
     const teamGroupID : string = "a66b7b2f-9f5d-4573-b763-542518574351";
     const teamSetID : string = "a9620950-3da0-4ab8-b191-f976f8b27852";
 
@@ -231,36 +165,34 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       });
   }
 
-  private getTeamOptions(): void {
+  private async getTeamOptions(): Promise<void> {
     try{
       if(this.properties.division !== undefined){
         
         this.getTeamLabels().then( (response) => {
-          this._teamOptions = [];
+          console.log("response",response);
+          //this._teamOptions = [];
 
           for(let x=0;x<response.value.length;x++){
-            //console.log("teamOptions",response);
 
             const teamName = response.value[x].labels[0].name;
             const teamTermID = response.value[x].id;
-    
             this._teamOptions.push(<IPropertyPaneDropdownOption>{
               text: teamName,
               key: teamName + ";" + teamTermID
             })
           }
-          //this.onDispose();         
         }).catch(err => {
           console.log('getTeamOptions ERROR:', err);
         });
         this.properties.teamDataChk = true;        
       }
     }catch(err){
-      Log.error('DocumentCentre', new Error('getTeamOptions Error message'), err);
+      console.log('getTeamOptions Error message', err);
     }
     return;
-  }  
-  
+  }
+
   public async onInit(): Promise<void> {
     await super.onInit();
     SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css");
@@ -321,8 +253,9 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
 
-    //const page2Obj : IPropertyPaneGroup["groupFields"] = [];
     let divisionDropdown : any={};
+    let libraryDropdown : any={};
+    let teamSelect : any={};
     
     divisionDropdown = PropertyPaneDropdown('division',{
       label:"Please choose your Division",
@@ -335,16 +268,19 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
       ]
     });
 
-    if(this.properties.division !== undefined){
-      //this.getTeamOptions();
-
-      if(this.properties.teamDataChk){
-        teamSelect =  PropertyPaneDropdown('teamTerm', {
-          label:'Please choose your team',
-          options: this._teamOptions
-        });
-      }
-
+    if(this.properties.libraryChk){
+      libraryDropdown = PropertyPaneDropdown('library',{
+        label:"Please choose a library",
+        options:[
+          { key : 'Policies', text : 'Policies'},
+          { key : 'Procedures', text : 'Procedures'},
+          { key : 'Guides', text : 'Guides'},
+          { key : 'Forms', text : 'Forms'},
+          { key : 'General', text : 'General'},
+          { key : 'Management', text : 'Management'},
+          { key : 'Custom', text : 'Custom'},
+        ]
+      });
     }
 
     console.log("***********************************************");
@@ -356,15 +292,18 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     console.log("teamName Prev",this.properties.teamNamePrev);
     console.log("teamDataCHK",this.properties.teamDataChk);
 
-/*    
-    page2Obj.push(
-      PropertyPaneDropdown('teamTerm', {
-        label:'Please choose Team',
+    if(this.properties.teamDataChk){
+      teamSelect = PropertyPaneDropdown('teamTerm', {
+        label:'Please choose your team',
         options: this._teamOptions
-      }), 
-    )    
-*/
+      });
+    }
 
+    if(this.properties.teamTerm!==undefined){
+      this.properties.teamName = this.properties.teamTerm.split(';')[0];
+      this.properties.teamTermID = this.properties.teamTerm.split(';')[1];
+    }
+  
     this.onDispose();         
 
     return {
@@ -400,14 +339,18 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
                   label: 'DC Power User?',
                   onText: 'Yes',
                   offText: 'No'                  
-                })
+                }),
+                PropertyPaneCheckbox('libraryChk', { 
+                  text: 'Specify which library to get data for?'
+                }),
+                libraryDropdown
               ]
             }
           ]
         },
         { //Page 2
           header: {
-            description: "Page 2 - Team Selection"
+            description: "Page 2 - Division & Team Selection"
           },
           groups: [
             {
@@ -420,7 +363,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
                   offText: 'No'                  
                 }),
                 divisionDropdown,
-                teamSelect
+                teamSelect,
               ]
             }
           ]
