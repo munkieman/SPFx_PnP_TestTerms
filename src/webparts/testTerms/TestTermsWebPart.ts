@@ -9,7 +9,7 @@ import {
   PropertyPaneHorizontalRule,
   PropertyPaneLabel,
   PropertyPaneToggle,
-  PropertyPaneCheckbox
+  PropertyPaneCheckbox,
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import type { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -22,11 +22,6 @@ import {
   SPHttpClient,
   SPHttpClientResponse,
 } from "@microsoft/sp-http";
-//import { spfi,SPFx } from "@pnp/sp/";
-//import { graphfi } from '@pnp/graph';
-//import { LogLevel, PnPLogging } from "@pnp/logging";
-//import "@pnp/sp/taxonomy";
-//import { ITermInfo } from "@pnp/sp/taxonomy";
 
 export interface ITestTermsWebPartProps {
   description: string;
@@ -50,6 +45,7 @@ export interface ITestTermsWebPartProps {
   teamNamePrev : string;
   termFlag:boolean;
   teamDataChk: boolean;
+  teamSelect : any;
 
   isDCPowerUser:any;
   isTeamPowerUser:any;
@@ -80,12 +76,12 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     this.properties.termFlag = false;
     this.properties.libraryChk = false;
     this._teamOptions = [];
+    this.properties.teamSelect = {};
 
     if(this.properties.division !== undefined){
       await this.getTeamOptions().then(()=>{
         console.log("render getTeamOptions");
         console.log("teamOptions length",this._teamOptions.length);  
-        alert('team options completed');
       });
     }
 
@@ -171,10 +167,8 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
         
         this.getTeamLabels().then( (response) => {
           console.log("response",response);
-          //this._teamOptions = [];
 
           for(let x=0;x<response.value.length;x++){
-
             const teamName = response.value[x].labels[0].name;
             const teamTermID = response.value[x].id;
             this._teamOptions.push(<IPropertyPaneDropdownOption>{
@@ -182,10 +176,21 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
               key: teamName + ";" + teamTermID
             })
           }
+          if(this._teamOptions.length>0){
+            //this.properties.teamDataChk = true;
+            //if(this.properties.teamDataChk){
+              console.log("getTeamOptions length",this._teamOptions.length);  
+              this.properties.teamSelect = PropertyPaneDropdown('teamTerm', {
+                label:'Please choose your team',
+                options: this._teamOptions
+              });
+            //}
+          }
+
         }).catch(err => {
           console.log('getTeamOptions ERROR:', err);
         });
-        this.properties.teamDataChk = true;        
+        console.log("TeamSelect",this.properties.teamSelect);  
       }
     }catch(err){
       console.log('getTeamOptions Error message', err);
@@ -255,7 +260,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
 
     let divisionDropdown : any={};
     let libraryDropdown : any={};
-    let teamSelect : any={};
+    //let teamSelect : any={};
     
     divisionDropdown = PropertyPaneDropdown('division',{
       label:"Please choose your Division",
@@ -292,12 +297,12 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
     console.log("teamName Prev",this.properties.teamNamePrev);
     console.log("teamDataCHK",this.properties.teamDataChk);
 
-    if(this.properties.teamDataChk){
-      teamSelect = PropertyPaneDropdown('teamTerm', {
-        label:'Please choose your team',
-        options: this._teamOptions
-      });
-    }
+    //if(this.properties.teamDataChk){
+    //  teamSelect = PropertyPaneDropdown('teamTerm', {
+    //    label:'Please choose your team',
+    //    options: this._teamOptions
+    //  });
+    //}
 
     if(this.properties.teamTerm!==undefined){
       this.properties.teamName = this.properties.teamTerm.split(';')[0];
@@ -363,7 +368,7 @@ export default class TestTermsWebPart extends BaseClientSideWebPart<ITestTermsWe
                   offText: 'No'                  
                 }),
                 divisionDropdown,
-                teamSelect,
+                this.properties.teamSelect,
               ]
             }
           ]
